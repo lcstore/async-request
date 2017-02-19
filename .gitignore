@@ -1,0 +1,16 @@
+target/
+bin/
+.svn/
+.classpath
+.project
+.settings
+MANIFEST.MF
+deploy.sh
+*.class
+*.dll
+*.exe
+*.o
+*.so
+logs/
+.DS_Store
+node_modules/

@@ -1,0 +1,31 @@
+{
+  "name": "async-request",
+  "version": "1.0.0",
+  "description": "async request",
+  "main": "index.js",
+  "scripts": {
+    "test": "no test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lcstore/async-request.git"
+  },
+  "keywords": [
+     "request",
+     "connect",
+     "async"
+  ],
+  "author": "lcstore",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lcstore/async-request/issues"
+  },
+  "homepage": "https://github.com/lcstore/async-request",
+  "dependencies": {
+    "async": "^1.5.0",
+    "extend": "^3.0.0",
+    "request": "^2.67.0",
+    "socks5-http-client": "^1.0.2",
+    "socks5-https-client": "^1.1.3"
+  }
+}
