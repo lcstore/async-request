@@ -9,7 +9,7 @@ describe('Async-request', function(){
 		options.encoding = null;
 		var req = new AsyncRequest(options,function(error,response){
 		   console.log('req:'+req.id)
-		   req.id.should.not.empty()
+		   req.id.should.above(0)
            endIt();
 		});
 	})
@@ -37,5 +37,6 @@ describe('Async-request', function(){
            console.log('response.html:'+html.length+',title:'+title)
            endIt();
 		});
+
 	})
 });
