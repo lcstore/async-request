@@ -13,8 +13,9 @@ function Channelmgr (){
     var self = this
     self._pools = []
     var maxCounts = [0,50,100,500,1000]
+    var maxCounts = [0,5000,100,500,1000]
     var incrCounts = [0,10,20,50,100]
-    for (var level = MIN_SELECT_LEVEL; level < MAX_SELECT_LEVEL; level++) {
+    for (var level = MIN_SELECT_LEVEL; level < 3; level++) {
         self._pools.push(new ChannelPool(level,maxCounts[level],incrCounts[level]))
     }
     // reverse for concatSeries
@@ -60,7 +61,8 @@ function ChannelPool(level,maxCount,incrCount){
     this._maxCount = maxCount
     this._incrCount = incrCount
     this._channels = []
-    this._maxKey = this._key
+    this._gtKey = this._key
+    this._ltKey = 'cl.'+(level+1)+'.'
     this._activeMap = {};
 }
 
@@ -84,13 +86,30 @@ ChannelPool.prototype.select = function (domain,scb){
               console.warn('pool:',self._level,',reach max:',self._maxCount,',len:',self._channels.length)
               return callback(null)
           }
-          self.load(self._maxKey,limit,function(error,oCells,nextKey){
+         var options = {};
+         options.gt = self._gtKey
+         options.lt = self._ltKey
+         options.limit = limit
+          self.load(options,function(error,oCells,nextKey){
             if(error) {
                 console.warn('error:'+error)
                 return
             }
             if(oCells.length > 0){
-                self._maxKey = nextKey
+                self._gtKey = nextKey
+                // var channelMap = {}
+                // for (var ic = 0; ic < self._channels.length; ic++) {
+                //     var oChannel = self._channels[ic]
+                //     var cKey = oChannel.host+':'+oChannel.port
+                //     channelMap[cKey] = oChannel
+                // };
+                // for (var io = 0; io < oCells.length; io++) {
+                //     var cell = oCells[io]
+                //     var cKey = cell.host+':'+cell.port
+                //     if(channelMap[cKey]){
+                //         continue
+                //     }
+                // };
                 self._channels = oCells.concat(self._channels)
                 self.selectOne(self._channels,interval,domain,function(err,oCell){
                     return callback(null,oCell);
@@ -107,11 +126,8 @@ ChannelPool.prototype.select = function (domain,scb){
 }
 
 
-ChannelPool.prototype.load = function(gt,limit,callback){
+ChannelPool.prototype.load = function(options,callback){
     var self = this;
-    var options = {};
-    options.gt = gt
-    options.limit = limit
     var nextKey
     var oCells = []
     db.createReadStream(options)
@@ -140,7 +156,7 @@ ChannelPool.prototype.load = function(gt,limit,callback){
         console.warn('load data,cause:', err)
       })
       .on('close', function () {
-         console.log('load gt[',gt,'],limit:',limit,',count:',oCells.length,',next:',nextKey || '')
+         console.log('load options:',JSON.stringify(options),',count:',oCells.length,',next:',nextKey || '')
          callback(null,oCells,nextKey);
       })
 }
@@ -154,10 +170,13 @@ ChannelPool.prototype.selectOne = function (oLevels,interval,domain,callback){
           oLevels.shift()
           continue;
        }
+       var curInterval = interval;
        if(domain && domain === oCell.recent){
-           if(oCell.atime + interval >= new Date().getTime()){
-              continue;
-           }
+           curInterval = 10*interval;
+          
+       }
+      if(oCell.atime + curInterval >= new Date().getTime()){
+           break;
        }
        // 由久到近选择
        oDest = oLevels.shift()
@@ -195,14 +214,49 @@ ChannelPool.prototype.receive = function(error,host,port,rcb){
         self.incrLevel(oCell,1,rcb)
     } else {
         self._channels.push(oCell);
-        return rcb(null)
+        if(oCell.select % 5 == 0){
+            self.update(oCell,rcb)
+        }else {
+            return rcb(null)
+        }
+        
     }
 }
+ChannelPool.prototype.update = function(oCell,ucb){
+    var oldKey = oCell.key
+    // cp.level.error.port.host
+    var keyArr = oldKey.split('.')
+    var index = 2
+    keyArr[index] = oCell.error
+    var newKey = keyArr.join('.')
 
+    var oCopy = extend({},oCell)
+    var delKeys = ['key','level','host','port']
+    for (var ik = 0; ik < delKeys.length; ik++) {
+       var delKey = delKeys[ik];
+       delete oCopy[delKey]
+    };
+    var newVal = JSON.stringify(oCopy)
+    var batch = db.batch()
+    if(oldKey != newKey){
+        batch.del(oldKey)
+    }
+    batch.put(newKey,newVal)
+         .write(function (err) { 
+            if(err){
+              console.warn('update,key[',oldKey,',',newKey,'],err:',err)
+            } else {
+              console.info('up key[',oldKey,',',newKey,']')
+            }
+            return ucb(err)
+         })
+
+}
 ChannelPool.prototype.incrLevel = function(oCell,incrNum,ccb){
     var self = this
     var oldLevel = oCell.level;
     var newLevel = oldLevel + incrNum;
+    newLevel = newLevel >= MAX_SELECT_LEVEL ? oldLevel : newLevel
     oCell.level  = newLevel;
     var oldKey = oCell.key
     // cp.level.error.port.host
@@ -244,7 +298,7 @@ ChannelPool.prototype.incrLevel = function(oCell,incrNum,ccb){
         db.put(pKey,pVal,function(perr){
             if(perr){
                 console.warn('put proxy[',pKey,'],to channel:',self._level,',cause:',err)
-                oCell -= incrNum
+                oCell.level = oldLevel
                 self._channels.push(oCell);
                 return ccb(perr)
             }

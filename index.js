@@ -17,7 +17,9 @@ function loadBaidu (sUrl,oCell,cb) {
 		options.gzip =true;
 		options.url = sUrl;
 		options.encoding = null;
-		options.proxy = 'http://'+oCell.host+':'+oCell.port;
+		if(oCell){
+			options.proxy = 'http://'+oCell.host+':'+oCell.port;
+		}
 		Request(options,function(error,response){
 			   if(error){
 			   	  return cb(error,oCell)
@@ -79,6 +81,9 @@ function doLoads(urls){
 			console.log('domain:',domain,',cell:'+JSON.stringify(oCell))
 			loadBaidu(sUrl,oCell,function(error,oData){
 			   console.log('url:',sUrl,',oData:',JSON.stringify(oData),',error:',error)
+			   if(!oData){
+			   	  return ucb(null)
+			   }
 			   Channelmgr.receive(error,oData.host,oData.port,oData.level,function(err){
 				   return ucb(null)
 		       })
