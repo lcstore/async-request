@@ -214,11 +214,12 @@ ChannelPool.prototype.receive = function(error,host,port,rcb){
         self.incrLevel(oCell,1,rcb)
     } else {
         self._channels.push(oCell);
-        if(oCell.select % 5 == 0){
-            self.update(oCell,rcb)
-        }else {
-            return rcb(null)
-        }
+        return rcb(null)
+        // if(oCell.select % 5 == 0){
+        //     self.update(oCell,rcb)
+        // }else {
+        //     return rcb(null)
+        // }
         
     }
 }

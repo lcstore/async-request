@@ -5,7 +5,7 @@ var Request = require('request')
 
 var Channelmgr = require('./channelmgr')
 
-function loadBaidu (sUrl,oCell,cb) {
+function loadPage (sUrl,oCell,cb) {
 	    var headers = {
 			'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
 			,'Accept-Encoding':'gzip, deflate, sdch, br'
@@ -45,9 +45,7 @@ function loadBaidu (sUrl,oCell,cb) {
 		                  html = iconv.decode(body, charset);
 		              }
 		              var bPass = false;
-		              if(html.indexOf('http://tieba.baidu.com/') > 0 
-		              	|| html.indexOf('https://zhidao.baidu.com/') >0
-		              	|| html.indexOf('http://news.baidu.com/') > 0 ) {
+		              if(html.indexOf('sina.com.cn') > 0 ) {
 						bPass = true;
 		              }
 		              if(!bPass) {
@@ -66,20 +64,16 @@ function loadBaidu (sUrl,oCell,cb) {
 		});
 }
 var urls = [];
-urls.push('https://www.baidu.com/')
-urls.push('http://news.baidu.com/')
-urls.push('http://v.baidu.com/')
-urls.push('http://music.baidu.com/')
-urls.push('http://wenku.baidu.com/')
-urls.push('https://baike.baidu.com/')
-urls.push('http://image.baidu.com/')
+urls.push('http://www.sina.com.cn/')
+urls.push('http://m.sina.com.cn/m/sinasports.shtml')
+
 var count = 0;
 function doLoads(urls){
 	async.concat(urls,function(sUrl,ucb){
 		var domain = URLParser.parse(sUrl).hostname
 		Channelmgr.select(domain,function(err,oCell){
 			console.log('domain:',domain,',cell:'+JSON.stringify(oCell))
-			loadBaidu(sUrl,oCell,function(error,oData){
+			loadPage(sUrl,oCell,function(error,oData){
 			   console.log('url:',sUrl,',oData:',JSON.stringify(oData),',error:',error)
 			   if(!oData){
 			   	  return ucb(null)
