@@ -16,7 +16,7 @@ fs.readFile('./proxy.txt', 'utf8',(err, data) => {
     var port = unitArr[1]
     // var key = 'cp.'+host+'.'+port;
     // cp.level.error.port.host
-    var key = 'cl.1.0.'+port+'.'+host;
+    var key = 'cl.1.'+port+'.'+host;
     // console.log('put key[',key,']');
     db.put(key,'{}',{sync:true},function(err){
         console.log('put key[',key,'],err:',err);

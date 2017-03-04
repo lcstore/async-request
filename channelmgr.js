@@ -1,11 +1,10 @@
 var URLParser = require('url')
-  , levelup = require('level')
   , async = require('async')
   , extend = require('extend')
 
-var db = levelup('./channelDB')
 
 var proxyutils = require('./lib/proxyutils')
+  , channelDao = require('./lib/channeldao')
 
 const MIN_SELECT_LEVEL=1
 const MAX_SELECT_LEVEL=5
@@ -13,7 +12,7 @@ function Channelmgr (){
     var self = this
     self._pools = []
     var maxCounts = [0,50,100,500,1000]
-    var maxCounts = [0,5000,100,500,1000]
+    var maxCounts = [0,50,100,500,1000]
     var incrCounts = [0,10,20,50,100]
     for (var level = MIN_SELECT_LEVEL; level < 3; level++) {
         self._pools.push(new ChannelPool(level,maxCounts[level],incrCounts[level]))
@@ -25,12 +24,18 @@ function Channelmgr (){
 Channelmgr.prototype.select = function(domain,callback){
    var self = this
    async.concatSeries(self._pools,function(oPool,ccb){
-       // console.log('select pool level:',oPool._level)
+       console.log('select pool level:',oPool._level)
        oPool.select(domain,function(err,data){
          var newErr = err;
-         if(data){
+         if(data) {
             newErr = new Error();
             newErr.name = 'Abort'
+         }
+         if(!err && !data) {
+          oPool.load()
+           // setImmediate(function() {
+           //    oPool.load()
+           // })
          }
          return ccb(newErr,data)
        })
@@ -55,289 +60,120 @@ Channelmgr.prototype.receive = function(error,host,port,level,rcb){
    }
 }
 
+
 function ChannelPool(level,maxCount,incrCount){
     this._key = 'cl.'+level+'.'
     this._level = level
     this._maxCount = maxCount
     this._incrCount = incrCount
-    this._channels = []
     this._gtKey = this._key
     this._ltKey = 'cl.'+(level+1)+'.'
-    this._activeMap = {};
+    this._channels = []
+    this._channelMap = {};
 }
 
-ChannelPool.prototype.select = function (domain,scb){
-     var self = this
-     var interval = 60000;
-     function callback(err,oCell){
-        if(oCell){
-          oCell.select++
-          var key = oCell.host +':'+oCell.port
-          self._activeMap[key] = oCell;
-        }
-        return scb(err,oCell)
-     }
-     self.selectOne(self._channels,interval,domain,function(err,data){
-          if(data){
-            return callback(null,data)
-          }
-          var limit = self._maxCount - self._channels.length;
-          if(limit < 0 ){
-              console.warn('pool:',self._level,',reach max:',self._maxCount,',len:',self._channels.length)
-              return callback(null)
-          }
-         var options = {};
-         options.gt = self._gtKey
-         options.lt = self._ltKey
-         options.limit = limit
-          self.load(options,function(error,oCells,nextKey){
-            if(error) {
-                console.warn('error:'+error)
-                return
-            }
-            if(oCells.length > 0){
-                self._gtKey = nextKey
-                // var channelMap = {}
-                // for (var ic = 0; ic < self._channels.length; ic++) {
-                //     var oChannel = self._channels[ic]
-                //     var cKey = oChannel.host+':'+oChannel.port
-                //     channelMap[cKey] = oChannel
-                // };
-                // for (var io = 0; io < oCells.length; io++) {
-                //     var cell = oCells[io]
-                //     var cKey = cell.host+':'+cell.port
-                //     if(channelMap[cKey]){
-                //         continue
-                //     }
-                // };
-                self._channels = oCells.concat(self._channels)
-                self.selectOne(self._channels,interval,domain,function(err,oCell){
-                    return callback(null,oCell);
-                })
-            }else {
-                // reload ChannelPool
-                return callback(null);
-            }
-          
-          });
-
-     })
-
-}
-
-
-ChannelPool.prototype.load = function(options,callback){
+ChannelPool.prototype.load = function(callback){
     var self = this;
-    var nextKey
-    var oCells = []
-    db.createReadStream(options)
-      .on('data', function (data) {
-        nextKey = data.key
-        var key = data.key
-        var oValue = JSON.parse(data.value)
-        // cp.level.error.port.host
-        var keyArr = key.split('.')
-        var index = 0;
-        var level = keyArr[++index]
-        var error = keyArr[++index]
-        var port = keyArr[++index]
-        var host = keyArr[++index]
-        var oCell = new ChannelCell(key,level)
-        for(var k in oValue){
-            oCell[k] = oValue[k]
-        }
-        oCell.error = error - 0;
-        oCell.host = proxyutils.long2ip(host)
-        oCell.port = port
-        oCells.push(oCell)
-        // console.log(data.key, '=', data.value)
-      })
-      .on('error', function (err) {
-        console.warn('load data,cause:', err)
-      })
-      .on('close', function () {
-         console.log('load options:',JSON.stringify(options),',count:',oCells.length,',next:',nextKey || '')
-         callback(null,oCells,nextKey);
-      })
+    var from = self._gtKey
+    var to = self._ltKey
+    var limit = 10
+    channelDao.find(from,to,limit,(err,channelArr) => {
+       console.log('load[',from,',',to,'].limit:',limit,',err:',err)
+       if(err) {
+          if(callback) {
+             callback(err)
+          }
+          return
+       }
+       var nextKey = self._key
+       for (var ic = 0; ic < channelArr.length; ic++) {
+         var oChannel = channelArr[ic]
+         var key = oChannel.host + ':' + oChannel.port
+         self._channels.push(oChannel)
+         self._channelMap[key] = oChannel
+         nextKey = oChannel.key
+       };
+       self._gtKey = nextKey
+       if(callback) {
+          callback(err)
+       }
+       return
+    })
 }
 
-ChannelPool.prototype.selectOne = function (oLevels,interval,domain,callback){
+ChannelPool.prototype.freeze = function(channel,ucb){
+    var self = this
+    channelDao.put(channel,(err) => {
+       var key =  channel.host +':'+channel.port
+       delete self._channelMap[key]
+       return ucb(err)
+    })
+}
+
+ChannelPool.prototype.select = function (domain,callback){
      var self = this
-     var oDest;
-     while(oLevels.length > 0){
-       var oCell = oLevels[0]
-       if(oCell.level != self._level){
-          oLevels.shift()
-          continue;
-       }
-       var curInterval = interval;
-       if(domain && domain === oCell.recent){
-           curInterval = 10*interval;
-          
-       }
-      if(oCell.atime + curInterval >= new Date().getTime()){
-           break;
-       }
-       // 由久到近选择
-       oDest = oLevels.shift()
-       oDest.atime = new Date().getTime()
-       oDest.domain = domain
-       break;
+     var oChannels = self._channels
+     while(oChannels.length > 0){
+       var oChannel = oChannels[0]
+       oChannel.open((err) => {
+          if(err){
+             if(err.name == 'USE_TOO_FAST') {
+                return callback(null)
+             } else if(err.name == 'USE_TOO_LONG' || err.name == 'USE_COUNT_LIMIT') {
+                self.freeze(oChannel,(ferr) => {
+                   if(!ferr) {
+                      oChannels.shift()
+                   }
+                })
+             }
+          } else {
+            oChannels.shift()
+            oChannel.domain = domain
+            oChannel.select ++
+            return callback(err,oChannel)
+          }
+       })
      }
-     return callback(null,oDest)
+     return callback(null)
 }
 
 
 ChannelPool.prototype.receive = function(error,host,port,rcb){
     var self = this
     var key = host+':'+port
-    var oCell = self._activeMap[key]
+    var oChannel = self._channelMap[key]
     var bError = error != null
-    if(!oCell){
-      console.warn('cell['+key+'] not exist,with error:'+bError )
-      return rcb('cell['+key+'] not exist')
+    if(!oChannel){
+      console.warn('channel['+key+'] not exist,with error:'+bError )
+      return rcb('channel['+key+'] not exist')
     }
     
-    delete self._activeMap[key]
-
     if(bError){
-        oCell.error++
+        oChannel.error++
     }else {
-        oCell.ok++
+        oChannel.ok++
     }
-    oCell.atime = new Date().getTime()
+    oChannel.atime = new Date().getTime()
 
     // change level
-    if(oCell.error >= oCell.ok + self._incrCount){
-        self.incrLevel(oCell,-1,rcb)
-    } else if(oCell.ok > oCell.error + self._incrCount){
-        self.incrLevel(oCell,1,rcb)
+    if(oChannel.error >= oChannel.ok + self._incrCount){
+        self.incrLevel(oChannel,-1,rcb)
+    } else if(oChannel.ok >= oChannel.error + self._incrCount){
+        self.incrLevel(oChannel,1,rcb)
     } else {
-        self._channels.push(oCell);
+        self._channels.push(oChannel);
         return rcb(null)
-        // if(oCell.select % 5 == 0){
-        //     self.update(oCell,rcb)
-        // }else {
-        //     return rcb(null)
-        // }
-        
     }
 }
-ChannelPool.prototype.update = function(oCell,ucb){
-    var oldKey = oCell.key
-    // cp.level.error.port.host
-    var keyArr = oldKey.split('.')
-    var index = 2
-    keyArr[index] = oCell.error
-    var newKey = keyArr.join('.')
 
-    var oCopy = extend({},oCell)
-    var delKeys = ['key','level','host','port']
-    for (var ik = 0; ik < delKeys.length; ik++) {
-       var delKey = delKeys[ik];
-       delete oCopy[delKey]
-    };
-    var newVal = JSON.stringify(oCopy)
-    var batch = db.batch()
-    if(oldKey != newKey){
-        batch.del(oldKey)
-    }
-    batch.put(newKey,newVal)
-         .write(function (err) { 
-            if(err){
-              console.warn('update,key[',oldKey,',',newKey,'],err:',err)
-            } else {
-              console.info('up key[',oldKey,',',newKey,']')
-            }
-            return ucb(err)
-         })
 
-}
-ChannelPool.prototype.incrLevel = function(oCell,incrNum,ccb){
+
+ChannelPool.prototype.incrLevel = function(oChannel,incrNum,ccb){
     var self = this
-    var oldLevel = oCell.level;
-    var newLevel = oldLevel + incrNum;
-    newLevel = newLevel >= MAX_SELECT_LEVEL ? oldLevel : newLevel
-    oCell.level  = newLevel;
-    var oldKey = oCell.key
-    // cp.level.error.port.host
-    var keyArr = oldKey.split('.')
-    var index = 0;
-    
-
-    var index = 0;
-    // level
-    keyArr[++index] = oCell.level
-    // error
-    keyArr[++index] = 0
-    var port = keyArr[++index]
-    var host = keyArr[++index]
-
-    var newKey = keyArr.join('.')
-    var delKeys = ['key','level','host','port']
-    for (var ik = 0; ik < delKeys.length; ik++) {
-       var delKey = delKeys[ik];
-       delete oCell[delKey]
-    };
-    var pKey = 'cp.'+host+'.'+port
-    db.get(pKey,function(err,value){
-
-        var pCell;
-        if(!value){
-            pCell = extend({},oCell);
-        } else {
-            pCell = JSON.parse(value)
-            pCell.ok += oCell.ok
-            pCell.error += oCell.error
-            pCell.select += oCell.select
-            pCell.atime = oCell.atime
-            pCell.domain = oCell.domain
-        }
-        pCell.level = newLevel
-
-        var pVal = JSON.stringify(pCell)
-        db.put(pKey,pVal,function(perr){
-            if(perr){
-                console.warn('put proxy[',pKey,'],to channel:',self._level,',cause:',err)
-                oCell.level = oldLevel
-                self._channels.push(oCell);
-                return ccb(perr)
-            }
-
-            db.del(oldKey, function (err) {
-              if (err) {
-                console.warn('del old level[',oldKey,'],cause:',err)
-              }
-              oCell.ok = 0
-              oCell.error = 0
-              oCell.select = 0
-              oCell.ctime = new Date().getTime()
-              var sValue = JSON.stringify(oCell)
-              db.put(newKey,sValue,function(nperr){
-                 if(nperr){
-                    console.warn('put new level:',newKey,',cause:',nperr)
-                 }
-                 return ccb(null)
-              })
-            });
-        })
-    })
-    
-
+    var newLevel = oChannel.level + incrNum
+    channelDao.changeLevel(oChannel,newLevel,ccb)
 }
 
-function ChannelCell(key,level){
-   // cp.level.error.port.host
-   this.key = key;
-   this.level = level - 0;
-   this.ctime = new Date().getTime()
-   this.atime = new Date().getTime()
-   // this.host
-   // this.port 
-   this.select = 0
-   this.error = 0
-   this.ok = 0
-   this.domain = ''
-}
+
 
 module.exports = new Channelmgr()

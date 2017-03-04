@@ -70,10 +70,10 @@ var levelup = require('level')
 	//  })})
 	it('batch  Read', function(endIt){
 		  	var options = {};
-		  	options.gt = 'cl.1'
+		  	options.gt = 'cl.'
 		  	// options.gt = 'cp.85.12345'
-		  	options.lt = 'cl.2'
-		  	// options.limit = 100;
+		  	// options.lt = 'cl.2'
+		  	options.limit = 100;
             var count = 0;
 		  	db.createReadStream(options)
 			  .on('data', function (data) {
