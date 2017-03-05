@@ -4,22 +4,30 @@ var URLParser = require('url')
   , fs = require('fs')
   , async = require('async')
 
-fs.readFile('./proxy.txt', 'utf8',(err, data) => {
+fs.readFile('./d.out', 'utf8',(err, data) => {
   if (err) throw err;
   var lineArr = data.split('\n')
   // for (var i = 0; i < lineArr.length; i++) {
     
   // };
   async.concat(lineArr, function(line,cb){
-    var unitArr = line.split('\t');
-    var host = unitArr[0]
-    var port = unitArr[1]
+    var unitArr = line.split('=');
+    var key = unitArr[0].trim()
+    var value = unitArr[1].trim()
+    var sKey = key
+    if(key.indexOf('cl')>=0){
+       var kArr = key.split('.')
+       if(kArr.length >= 5) {
+          kArr.splice(2,1)
+          sKey = kArr.join('.').trim()
+       }
+    }
+    var sVal = value
     // var key = 'cp.'+host+'.'+port;
     // cp.level.error.port.host
-    var key = 'cl.1.'+port+'.'+host;
-    // console.log('put key[',key,']');
-    db.put(key,'{}',{sync:true},function(err){
-        console.log('put key[',key,'],err:',err);
+    console.log('key:'+sKey+',sVal:'+sVal);
+    db.put(sKey,sVal,{sync:true},function(err){
+        console.log('put key[',sKey,'],err:',err);
         return cb(null)
     })
   }, function(err, files) {

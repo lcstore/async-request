@@ -20,6 +20,9 @@ function loadPage (sUrl,oCell,cb) {
 		if(oCell){
 			options.proxy = 'http://'+oCell.host+':'+oCell.port;
 		}
+		if(options.proxy){
+			console.log('url:',sUrl,',proxy[',options.proxy,']')
+		}
 		Request(options,function(error,response){
 			   if(error){
 			   	  return cb(error,oCell)
@@ -45,9 +48,14 @@ function loadPage (sUrl,oCell,cb) {
 		                  html = iconv.decode(body, charset);
 		              }
 		              var bPass = false;
-		              if(html.indexOf('sina.com.cn') > 0 ) {
-						bPass = true;
-		              }
+		    //           if(html.indexOf('sina.com.cn') > 0 ) {
+						// bPass = true;
+		    //           }
+		              if(html.indexOf('http://tieba.baidu.com/') > 0 
+						  	|| html.indexOf('https://zhidao.baidu.com/') >0
+						  	|| html.indexOf('http://news.baidu.com/') > 0 ) {
+									bPass = true;
+					  }
 		              if(!bPass) {
 		              	error = new Error()
 		              	error.name = 'BadHtml'
@@ -63,18 +71,31 @@ function loadPage (sUrl,oCell,cb) {
               return cb(error,oCell)
 		});
 }
+// var urls = [];
+// urls.push('http://www.sina.com.cn/')
+// urls.push('http://m.sina.com.cn/m/sinasports.shtml')
+
 var urls = [];
-urls.push('http://www.sina.com.cn/')
-urls.push('http://m.sina.com.cn/m/sinasports.shtml')
+urls.push('https://www.baidu.com/')
+urls.push('http://news.baidu.com/')
+urls.push('http://v.baidu.com/')
+urls.push('http://music.baidu.com/')
+urls.push('http://wenku.baidu.com/')
+urls.push('https://baike.baidu.com/')
+urls.push('http://image.baidu.com/')
 
 var count = 0;
 function doLoads(urls){
 	async.concat(urls,function(sUrl,ucb){
 		var domain = URLParser.parse(sUrl).hostname
 		Channelmgr.select(domain,function(err,oCell){
+			if(!oCell) {
+				console.log('null channel.')
+				return ucb()
+			}
 			console.log('domain:',domain,',cell:'+JSON.stringify(oCell))
 			loadPage(sUrl,oCell,function(error,oData){
-			   console.log('url:',sUrl,',oData:',JSON.stringify(oData),',error:',error)
+			   console.log('url:',sUrl,',oData:',oData,',error:',error)
 			   if(!oData){
 			   	  return ucb(null)
 			   }
@@ -85,11 +106,11 @@ function doLoads(urls){
 			})
 		})
 	},function(err,rets){
-		
+		console.log('[',new Date(),'],batch end.err:',err)
 	})
 }
 setInterval(function(){
 	count++;
-    console.log("count:"+count+',run doLoads');
+    console.log('[',new Date(),"],setInterval,count:"+count+',run doLoads');
     doLoads(urls)
 },1000);

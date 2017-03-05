@@ -3,7 +3,7 @@ var URLParser = require('url')
   , extend = require('extend')
 
 
-var proxyutils = require('./lib/proxyutils')
+var proxyutils = require('./lib/toolutils')
   , channelDao = require('./lib/channeldao')
 
 const MIN_SELECT_LEVEL=1
@@ -14,7 +14,7 @@ function Channelmgr (){
     var maxCounts = [0,50,100,500,1000]
     var maxCounts = [0,50,100,500,1000]
     var incrCounts = [0,10,20,50,100]
-    for (var level = MIN_SELECT_LEVEL; level < 3; level++) {
+    for (var level = MIN_SELECT_LEVEL; level < 2; level++) {
         self._pools.push(new ChannelPool(level,maxCounts[level],incrCounts[level]))
     }
     // reverse for concatSeries
@@ -26,16 +26,24 @@ Channelmgr.prototype.select = function(domain,callback){
    async.concatSeries(self._pools,function(oPool,ccb){
        console.log('select pool level:',oPool._level)
        oPool.select(domain,function(err,data){
+         console.log('[',new Date(),'],select pool level:',oPool._level+',err:',err,',size[',oPool._channels.length,'/',oPool._maxCount,']')
          var newErr = err;
          if(data) {
-            newErr = new Error();
-            newErr.name = 'Abort'
+            data.request((rerr) => {
+               if(!rerr) {
+                  newErr = new Error();
+                  newErr.name = 'Abort'
+               } else {
+                  data = null
+               }
+            })
          }
          if(!err && !data) {
-          oPool.load()
-           // setImmediate(function() {
-           //    oPool.load()
-           // })
+           // console.log('[',new Date(),']setImmediate,oPool.load')
+           setImmediate(function() {
+              console.log('[',new Date(),']call,oPool.load')
+              oPool.load()
+           })
          }
          return ccb(newErr,data)
        })
@@ -76,9 +84,16 @@ ChannelPool.prototype.load = function(callback){
     var self = this;
     var from = self._gtKey
     var to = self._ltKey
-    var limit = 10
+    var limit = self._maxCount - self._channels.length
+    console.log('pre load[',from,',',to,'].limit:',limit)
+    if(limit < 1) {
+      if(callback) {
+             callback(err)
+       }
+       return
+    }
     channelDao.find(from,to,limit,(err,channelArr) => {
-       console.log('load[',from,',',to,'].limit:',limit,',err:',err)
+       console.log('load[',from,',',to,'].limit:',limit,',err:',err,',channelArr:',channelArr?channelArr.length:-1)
        if(err) {
           if(callback) {
              callback(err)
@@ -103,38 +118,50 @@ ChannelPool.prototype.load = function(callback){
 
 ChannelPool.prototype.freeze = function(channel,ucb){
     var self = this
+    console.log('[',new Date(),'],freeze channel:',JSON.stringify(channel))
     channelDao.put(channel,(err) => {
        var key =  channel.host +':'+channel.port
+       console.log('freeze['+key+'],channel:'+JSON.stringify(channel))
        delete self._channelMap[key]
        return ucb(err)
     })
 }
 
-ChannelPool.prototype.select = function (domain,callback){
+ChannelPool.prototype.select = function (domain,scb){
      var self = this
      var oChannels = self._channels
-     while(oChannels.length > 0){
-       var oChannel = oChannels[0]
-       oChannel.open((err) => {
-          if(err){
-             if(err.name == 'USE_TOO_FAST') {
-                return callback(null)
-             } else if(err.name == 'USE_TOO_LONG' || err.name == 'USE_COUNT_LIMIT') {
-                self.freeze(oChannel,(ferr) => {
-                   if(!ferr) {
-                      oChannels.shift()
-                   }
-                })
-             }
-          } else {
-            oChannels.shift()
-            oChannel.domain = domain
-            oChannel.select ++
-            return callback(err,oChannel)
-          }
-       })
+     if(oChannels.length < 1) {
+        return scb()
      }
-     return callback(null)
+     function callback(err,channel){
+       if(!err && channel) {
+          oChannels.shift()
+          channel.domain = domain
+          channel.select ++
+          return scb(null,channel)
+       }
+       if(err.name == 'USE_TOO_LONG' || err.name == 'USE_COUNT_LIMIT' 
+        || (err.name == 'USE_TOO_FAST' && self._maxCount <= self._channels.length)) {
+        console.log('freeze:',JSON.stringify(oChannel))
+        self.freeze(oChannel,(ferr) => {
+           if(!ferr) {
+              oChannels.shift()
+           }
+           return scb()
+        })
+       } else {
+         return scb()
+       }
+     }
+     var oDest = null
+     var oChannel = oChannels[0]
+     console.log('pool.select:'+JSON.stringify(oChannel))
+
+     oChannel.open((err) => {
+        console.log('pool.select.open:'+JSON.stringify(oChannel)+',err:',err)
+        return callback(err,oChannel)
+     })
+     
 }
 
 
@@ -155,15 +182,18 @@ ChannelPool.prototype.receive = function(error,host,port,rcb){
     }
     oChannel.atime = new Date().getTime()
 
-    // change level
-    if(oChannel.error >= oChannel.ok + self._incrCount){
-        self.incrLevel(oChannel,-1,rcb)
-    } else if(oChannel.ok >= oChannel.error + self._incrCount){
-        self.incrLevel(oChannel,1,rcb)
-    } else {
-        self._channels.push(oChannel);
-        return rcb(null)
-    }
+    oChannel.close(() => {
+         console.log('close,channel:',JSON.stringify(oChannel))
+        if(oChannel.error >= oChannel.ok + self._incrCount){
+            self.incrLevel(oChannel,-1,rcb)
+        } else if(oChannel.ok >= oChannel.error + self._incrCount){
+            self.incrLevel(oChannel,1,rcb)
+        } else {
+            self._channels.push(oChannel);
+            return rcb(null)
+        }
+    })
+    // oChannel.close()
 }
 
 
