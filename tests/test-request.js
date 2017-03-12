@@ -12,6 +12,8 @@ describe('Async-request', function(){
 		   req.id.should.above(0)
            endIt();
 		});
+		should(req.id).not.null
+		req.start()
 	})
 	it('Get request,return 200', function(endIt){
 		var headers = {
@@ -35,8 +37,9 @@ describe('Async-request', function(){
            end = end > html.length?html.length:end;
            var title = html.substring(index,end);
            console.log('response.html:'+html.length+',title:'+title)
+           console.log('reqMills:'+req.reqMills + ',end:'+req.endMills)
            endIt();
 		});
-
+		req.start()
 	})
 });

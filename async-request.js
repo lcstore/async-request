@@ -4,7 +4,7 @@ var util = require('util')
   , moment = require('moment')
   , URLParser = require('url')
 var AsyncId = require('./async-id').asyncId
-Request.debug = true
+// Request.debug = true
 
 function AsyncRequest(options, callback) {
 	var self = this;
@@ -13,27 +13,30 @@ function AsyncRequest(options, callback) {
 	self.domain =  URLParser.parse(options.url).hostname;
 	self.id = AsyncId.next();
 	self.taskId = options.taskId;
-	self.creation = new Date().getTime();
-	// self.requestId = makeId(options.url,self.taskId);
-	events.EventEmitter.call(this);
-	Requestmgr.addRequest(this);
+	self.initMills = new Date().getTime();
+
+	events.EventEmitter.call(self)
 }
 util.inherits(AsyncRequest, events.EventEmitter);
 
-function makeId(taskId){
-	var sTime =  moment().format('YYYYMMDDHHmmss');
-    var sRequestId = sTime+'-'+taskId+'-'+ AsyncId.next();
-    return sRequestId;
+AsyncRequest.prototype.start = function () {
+	var self = this
+	self.emit('init',self)
+	self.req = Request(self.options, self.callback)
+	self.req.on('request', self.onRequest.bind(self))
+	self.req.on('complete', self.onComplete.bind(self))
+	self.req.on('error', self.onComplete.bind(self))
 }
 
-function makeId(taskId){
-	var sTime =  moment().format('YYYYMMDDHHmmss');
-    var sRequestId = sTime+'-'+taskId+'-'+ AsyncId.next();
-    return sRequestId;
+AsyncRequest.prototype.onRequest = function (req) {
+    var self = this
+    self.reqMills = new Date().getTime()
 }
 
-function RequestFuture(){
-
+AsyncRequest.prototype.onComplete = function (response, body) {
+	var self = this
+	self.endMills = new Date().getTime()
+	self.emit('complete',self)
 }
 
 module.exports = AsyncRequest

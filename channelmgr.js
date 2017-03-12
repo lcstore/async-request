@@ -12,7 +12,7 @@ function Channelmgr (){
     var self = this
     self._pools = []
     var maxCounts = [0,50,100,500,1000]
-    var maxCounts = [0,50,100,500,1000]
+    var maxCounts = [0,500,100,500,1000]
     var incrCounts = [0,10,20,50,100]
     for (var level = MIN_SELECT_LEVEL; level < 2; level++) {
         self._pools.push(new ChannelPool(level,maxCounts[level],incrCounts[level]))
@@ -75,6 +75,7 @@ function ChannelPool(level,maxCount,incrCount){
     this._maxCount = maxCount
     this._incrCount = incrCount
     this._gtKey = this._key
+    this._gtKey = 'cl.1.8888.465957466'
     this._ltKey = 'cl.'+(level+1)+'.'
     this._channels = []
     this._channelMap = {};
@@ -85,7 +86,6 @@ ChannelPool.prototype.load = function(callback){
     var from = self._gtKey
     var to = self._ltKey
     var limit = self._maxCount - self._channels.length
-    console.log('pre load[',from,',',to,'].limit:',limit)
     if(limit < 1) {
       if(callback) {
              callback(err)
@@ -184,7 +184,8 @@ ChannelPool.prototype.receive = function(error,host,port,rcb){
 
     oChannel.close(() => {
          console.log('close,channel:',JSON.stringify(oChannel))
-        if(oChannel.error >= oChannel.ok + self._incrCount){
+         var errIncrCount = parseInt(self._incrCount / 2)
+        if(oChannel.error >= oChannel.ok + errIncrCount){
             self.incrLevel(oChannel,-1,rcb)
         } else if(oChannel.ok >= oChannel.error + self._incrCount){
             self.incrLevel(oChannel,1,rcb)
