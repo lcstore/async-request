@@ -14,7 +14,7 @@ function AsyncRequest(options, callback) {
 	self.id = AsyncId.next();
 	self.taskId = options.taskId;
 	self.initMills = new Date().getTime();
-
+    console.log('AsyncRequest:'+ JSON.stringify(options))
 	events.EventEmitter.call(self)
 }
 util.inherits(AsyncRequest, events.EventEmitter);

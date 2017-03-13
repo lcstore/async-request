@@ -14,7 +14,7 @@ function Channelmgr (){
     var maxCounts = [0,50,100,500,1000]
     var maxCounts = [0,500,100,500,1000]
     var incrCounts = [0,10,20,50,100]
-    for (var level = MIN_SELECT_LEVEL; level < 2; level++) {
+    for (var level = MIN_SELECT_LEVEL; level < MAX_SELECT_LEVEL; level++) {
         self._pools.push(new ChannelPool(level,maxCounts[level],incrCounts[level]))
     }
     // reverse for concatSeries
@@ -54,18 +54,29 @@ Channelmgr.prototype.select = function(domain,callback){
    
 }
 
-Channelmgr.prototype.receive = function(error,host,port,level,rcb){
+Channelmgr.prototype.receive = function(error,channelKey,rcb){
     var self  = this;
-   if (isNaN(level)) {
-      console.log('not a level:'+level+',addr:'+host+':'+port)
+   if (!channelKey || channelKey.indexOf(':') < 0) {
+      console.log('illegal channel['+channelKey + ']')
       return;
    }
-   var oPool = self._pools[self._pools.length - level];
-   if(oPool){
-      oPool.receive(error,host,port,rcb)
-   }else {
-     rcb('pool['+level+'] not exist')
+   var oDestPool;
+   for (var pi = 0; pi < self._pools.length; pi++) {
+      var oPool = self._pools[pi]
+      if(oPool._channelMap[channelKey]) {
+         oDestPool = oPool
+         break
+      }
    }
+   if(!oDestPool) {
+     var err = new Error()
+     err.name = 'NotExist'
+     err.message = 'Not exist channel['+channelKey+']'
+     return rcb(err)
+   } else {
+     return oDestPool.receive(error,channelKey,rcb)
+   }
+
 }
 
 
@@ -165,17 +176,31 @@ ChannelPool.prototype.select = function (domain,scb){
 }
 
 
-ChannelPool.prototype.receive = function(error,host,port,rcb){
+ChannelPool.prototype.receive = function(error,channelKey,rcb){
     var self = this
-    var key = host+':'+port
-    var oChannel = self._channelMap[key]
-    var bError = error != null
-    if(!oChannel){
-      console.warn('channel['+key+'] not exist,with error:'+bError )
-      return rcb('channel['+key+'] not exist')
+    if (!channelKey || channelKey.indexOf(':') < 0) {
+      console.log('Pool['+self._level+'],illegal channel['+channelKey + ']')
+      var err = new Error()
+      err.name = 'NotExist'
+      err.message = 'Not exist channel['+channelKey+']'
+      return rcb(err);
     }
     
-    if(bError){
+    var oChannel = self._channelMap[channelKey]
+    if(!oChannel){
+      console.log('Pool['+self._level+'],not exist channel['+channelKey + ']')
+      var err = new Error()
+      err.name = 'NotExist'
+      err.message = 'Not exist channel['+channelKey+']'
+      return rcb(err)
+    }
+    //local net error
+    if(error && error.code === 'ENOTFOUND') {
+       var err = new Error()
+       err.name = 'SkipErr'
+       return rcb(err)
+    }
+    if(error){
         oChannel.error++
     }else {
         oChannel.ok++
@@ -183,8 +208,7 @@ ChannelPool.prototype.receive = function(error,host,port,rcb){
     oChannel.atime = new Date().getTime()
 
     oChannel.close(() => {
-         console.log('close,channel:',JSON.stringify(oChannel))
-         var errIncrCount = parseInt(self._incrCount / 2)
+        var errIncrCount = parseInt(self._incrCount / 2) + self._incrCount % 2
         if(oChannel.error >= oChannel.ok + errIncrCount){
             self.incrLevel(oChannel,-1,rcb)
         } else if(oChannel.ok >= oChannel.error + self._incrCount){

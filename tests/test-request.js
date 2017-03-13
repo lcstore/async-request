@@ -28,6 +28,7 @@ describe('Async-request', function(){
 		options.url = 'https://segmentfault.com/a/1190000002921481';
 		options.encoding = null;
 		var req = new AsyncRequest(options,function(error,response){
+			console.log('errorXX:'+JSON.stringify(error))
 		   response.statusCode.should.eql(200)
 		   var html = iconv.decode(response.body, 'UTF-8');
            console.log('response:'+response.statusCode)
