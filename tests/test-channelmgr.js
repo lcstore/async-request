@@ -19,9 +19,8 @@ describe('Channelmgr', function(){
 		 var domain = 'baidu.com'
 		 setTimeout(function() {
 		     Channelmgr.select(domain,function(err,oCell){
-		     	 var channelKey = oCell.host+':'+oCell.port
-				 console.log('select:'+channelKey)
-				 Channelmgr.receive(null,channelKey,function(err,oCell){
+				 console.log('select:'+JSON.stringify(oCell))
+				 Channelmgr.receive(null,oCell,function(err,oCell){
 					 console.log('receive:',JSON.stringify(oCell))
 			         endIt()
 		         })

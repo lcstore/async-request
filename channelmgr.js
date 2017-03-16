@@ -21,6 +21,19 @@ function Channelmgr (){
     self._pools = self._pools.reverse();
 }
 
+Channelmgr.prototype.addChannel = function(level,host,port,callback){
+   var bPass = level && host && port
+   if(!bPass) {
+     var err = new Error()
+     err.name = 'BadParam'
+     err.message = 'BadParam,level['+level+'],host['+host+'],port['+port+']'
+     return callback(err)
+   } else {
+     channelDao.addChannel(level,host,port,callback) 
+   }
+   
+}
+
 Channelmgr.prototype.select = function(domain,callback){
    var self = this
    async.concatSeries(self._pools,function(oPool,ccb){
@@ -54,14 +67,25 @@ Channelmgr.prototype.select = function(domain,callback){
    
 }
 
-Channelmgr.prototype.receive = function(error,channelKey,rcb){
+Channelmgr.prototype.receive = function(error,oChannel,rcb){
     var self  = this;
-   if (!channelKey || channelKey.indexOf(':') < 0) {
-      console.log('illegal channel['+channelKey + ']')
-      return;
+   if (!oChannel || !oChannel.host || !oChannel.port) {
+      var channelKey = oChannel ? (oChannel.host + ':' + oChannel.port) : null
+      var level = oChannel ? oChannel.level : null
+      var msg = 'Not exist channel['+channelKey+'],level:' + level
+      console.log(msg)
+      var err = new Error()
+      err.name = 'NotExist'
+      err.message = msg
+      return doCallBack(err,rcb)
    }
-   var oDestPool;
-   for (var pi = 0; pi < self._pools.length; pi++) {
+   var channelKey = oChannel.host + ':' + oChannel.port
+   var oDestPool = self._pools[oChannel.level];
+   //level may be had change
+   if(oDestPool && !oDestPool._channelMap[channelKey]) {
+      oDestPool = null
+   }
+   for (var pi = self._pools.length -1 ; pi >=0 ; pi--) {
       var oPool = self._pools[pi]
       if(oPool._channelMap[channelKey]) {
          oDestPool = oPool
@@ -71,8 +95,8 @@ Channelmgr.prototype.receive = function(error,channelKey,rcb){
    if(!oDestPool) {
      var err = new Error()
      err.name = 'NotExist'
-     err.message = 'Not exist channel['+channelKey+']'
-     return rcb(err)
+     err.message = 'Not exist channel['+channelKey+'],level:' + oChannel.level
+     return doCallBack(err,rcb)
    } else {
      return oDestPool.receive(error,channelKey,rcb)
    }
@@ -142,7 +166,7 @@ ChannelPool.prototype.select = function (domain,scb){
      var self = this
      var oChannels = self._channels
      if(oChannels.length < 1) {
-        return scb()
+        return scb(null)
      }
      function callback(err,channel){
        if(!err && channel) {
@@ -158,10 +182,10 @@ ChannelPool.prototype.select = function (domain,scb){
            if(!ferr) {
               oChannels.shift()
            }
-           return scb()
+           return scb(err)
         })
        } else {
-         return scb()
+         return scb(null)
        }
      }
      var oDest = null
@@ -183,7 +207,7 @@ ChannelPool.prototype.receive = function(error,channelKey,rcb){
       var err = new Error()
       err.name = 'NotExist'
       err.message = 'Not exist channel['+channelKey+']'
-      return rcb(err);
+      return doCallBack(err,rcb)
     }
     
     var oChannel = self._channelMap[channelKey]
@@ -192,13 +216,13 @@ ChannelPool.prototype.receive = function(error,channelKey,rcb){
       var err = new Error()
       err.name = 'NotExist'
       err.message = 'Not exist channel['+channelKey+']'
-      return rcb(err)
+      return doCallBack(err,rcb)
     }
     //local net error
     if(error && error.code === 'ENOTFOUND') {
        var err = new Error()
        err.name = 'SkipErr'
-       return rcb(err)
+       return doCallBack(err,rcb)
     }
     if(error){
         oChannel.error++
@@ -215,10 +239,20 @@ ChannelPool.prototype.receive = function(error,channelKey,rcb){
             self.incrLevel(oChannel,1,rcb)
         } else {
             self._channels.push(oChannel);
-            return rcb(null)
+            return doCallBack(null,rcb)
         }
     })
-    // oChannel.close()
+}
+
+function doCallBack (err,callback) {
+  if(!callback) {
+    if(err) {
+      console.warn('cause:',err)  
+    }
+  } else {
+    return callback(err)
+  }
+  
 }
 
 
