@@ -23,6 +23,9 @@ function Channelmgr (){
 
 Channelmgr.prototype.addChannel = function(level,host,port,callback){
    var bPass = level && host && port
+   if(port <= 0 || port >= 65536) {
+      bPass = false;
+   }
    if(!bPass) {
      var err = new Error()
      err.name = 'BadParam'
