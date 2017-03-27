@@ -83,6 +83,7 @@ Channelmgr.prototype.receive = function(error,oChannel,rcb){
       return doCallBack(err,rcb)
    }
    var channelKey = oChannel.host + ':' + oChannel.port
+   console.info('receive['+ channelKey +'],state:'+ error)
    var oDestPool = self._pools[oChannel.level];
    //level may be had change
    if(oDestPool && !oDestPool._channelMap[channelKey]) {
@@ -233,7 +234,7 @@ ChannelPool.prototype.receive = function(error,channelKey,rcb){
         oChannel.ok++
     }
     oChannel.atime = new Date().getTime()
-
+    console.log('Pool['+self._level+'], closeChannel['+channelKey + ']')
     oChannel.close(() => {
         var errIncrCount = parseInt(self._incrCount / 2) + self._incrCount % 2
         if(oChannel.error >= oChannel.ok + errIncrCount){
