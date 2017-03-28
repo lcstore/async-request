@@ -179,15 +179,20 @@ ChannelPool.prototype.select = function (domain,scb){
           channel.select ++
           return scb(null,channel)
        }
-       if(err.name == 'USE_TOO_LONG' || err.name == 'USE_COUNT_LIMIT' 
+       if(!err && !channel){
+          return scb(null);
+       } else if(err.name == 'USE_TOO_LONG' || err.name == 'USE_COUNT_LIMIT' 
         || (err.name == 'USE_TOO_FAST' && self._maxCount <= self._channels.length)) {
-        console.log('freeze:',JSON.stringify(oChannel))
-        self.freeze(oChannel,(ferr) => {
+        console.log('freeze:',JSON.stringify(channel))
+        self.freeze(channel,(ferr) => {
            if(!ferr) {
               oChannels.shift()
            }
            return scb(err)
         })
+       } else if(err.name == 'REOPEN' || err.name == 'REREQUEST'){
+          oChannels.shift()
+          oChannels.push(channel)
        } else {
          return scb(null)
        }
