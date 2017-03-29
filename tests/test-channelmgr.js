@@ -25,7 +25,7 @@ describe('Channelmgr', function(){
 			         endIt()
 		         })
 	         })
-		 }, 1000);
+		 }, 10000);
 
 	})
 });

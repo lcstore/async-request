@@ -47,8 +47,7 @@ Channelmgr.prototype.select = function(domain,callback){
          if(data) {
             data.request((rerr) => {
                if(!rerr) {
-                  newErr = new Error();
-                  newErr.name = 'Abort'
+                  newErr = rerr;
                } else {
                   data = null
                }
@@ -181,18 +180,15 @@ ChannelPool.prototype.select = function (domain,scb){
        }
        if(!err && !channel){
           return scb(null);
-       } else if(err.name == 'USE_TOO_LONG' || err.name == 'USE_COUNT_LIMIT' 
+       } else if(err.name == 'USE_TOO_LONG' 
+        || err.name == 'USE_COUNT_LIMIT' 
+        || (err.name == 'REOPEN' && channel.isUseTooLong())
         || (err.name == 'USE_TOO_FAST' && self._maxCount <= self._channels.length)) {
         console.log('freeze:',JSON.stringify(channel))
+        oChannels.shift()
         self.freeze(channel,(ferr) => {
-           if(!ferr) {
-              oChannels.shift()
-           }
            return scb(err)
         })
-       } else if(err.name == 'REOPEN' || err.name == 'REREQUEST'){
-          oChannels.shift()
-          oChannels.push(channel)
        } else {
          return scb(null)
        }
@@ -240,7 +236,8 @@ ChannelPool.prototype.receive = function(error,channelKey,rcb){
     }
     oChannel.atime = new Date().getTime()
     console.log('Pool['+self._level+'], closeChannel['+channelKey + ']')
-    oChannel.close(() => {
+    oChannel.close((serr, status) => {
+        console.log('Pool['+self._level+'], closeChannel['+channelKey + '],status:'+status)
         var errIncrCount = parseInt(self._incrCount / 2) + self._incrCount % 2
         if(oChannel.error >= oChannel.ok + errIncrCount){
             self.incrLevel(oChannel,-1,rcb)
