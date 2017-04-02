@@ -74,10 +74,10 @@ Channelmgr.prototype.receive = function(error,oChannel,rcb){
    if (!oChannel || !oChannel.host || !oChannel.port) {
       var channelKey = oChannel ? (oChannel.host + ':' + oChannel.port) : null
       var level = oChannel ? oChannel.level : null
-      var msg = 'Not exist channel['+channelKey+'],level:' + level
+      var msg = 'Ignore channel['+channelKey+'],level:' + level
       console.log(msg)
       var err = new Error()
-      err.name = 'NotExist'
+      err.name = 'IllegalArgs'
       err.message = msg
       return doCallBack(err,rcb)
    }
@@ -86,6 +86,7 @@ Channelmgr.prototype.receive = function(error,oChannel,rcb){
    var oDestPool = self._pools[oChannel.level];
    //level may be had change
    if(oDestPool && !oDestPool._channelMap[channelKey]) {
+      console.log('channelKey['+channelKey+'] miss,keys:'+JSON.stringify(Object.keys(oDestPool._channelMap)))
       oDestPool = null
    }
    for (var pi = self._pools.length -1 ; pi >=0 ; pi--) {
