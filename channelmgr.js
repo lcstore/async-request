@@ -1,4 +1,5 @@
 var URLParser = require('url')
+  , Promise = require('bluebird')
   , async = require('async')
   , extend = require('extend')
 
@@ -12,7 +13,6 @@ function Channelmgr (){
     var self = this
     self._pools = []
     var maxCounts = [0,50,100,500,1000]
-    var maxCounts = [0,500,100,500,1000]
     var incrCounts = [0,10,20,50,100]
     for (var level = MIN_SELECT_LEVEL; level < MAX_SELECT_LEVEL; level++) {
         self._pools.push(new ChannelPool(level,maxCounts[level],incrCounts[level]))
@@ -86,7 +86,7 @@ Channelmgr.prototype.receive = function(error,oChannel,rcb){
    var oDestPool = self._pools[oChannel.level];
    //level may be had change
    if(oDestPool && !oDestPool._channelMap[channelKey]) {
-      console.log('channelKey['+channelKey+'] miss,keys:'+JSON.stringify(Object.keys(oDestPool._channelMap)))
+      // console.log('channelKey['+channelKey+'] miss,keys:'+JSON.stringify(Object.keys(oDestPool._channelMap)))
       oDestPool = null
    }
    for (var pi = self._pools.length -1 ; pi >=0 ; pi--) {

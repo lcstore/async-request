@@ -68,30 +68,30 @@ var levelup = require('level')
 	// 		    console.log('Stream ended')
 	// 		  })
 	//  })})
-	// it('batch  Read', function(endIt){
-	// 	    this.timeout(150000);
-	// 	  	var options = {};
-	// 	  	options.gt = 'cl.1.80.2016916528'
-	// 	  	options.gt = 'cl.1'
-	// 	  	options.lt = 'cl.2'
-	// 	  	// options.limit = 100;
- //            var count = 0;
-	// 	  	db.createReadStream(options)
-	// 		  .on('data', function (data) {
-	// 		  	count++
-	// 		    console.log(data.key, '=', data.value)
-	// 		  })
-	// 		  .on('error', function (err) {
-	// 		    console.log('Oh my!', err)
-	// 		  })
-	// 		  .on('close', function () {
-	// 		    console.log('Stream closed')
-	// 		    endIt();
-	// 		  })
-	// 		  .on('end', function () {
-	// 		    console.log('Stream ended,count:'+count)
-	// 		  })
-	//   })
+	it('batch  Read', function(endIt){
+		    this.timeout(150000);
+		  	var options = {};
+		  	options.gt = 'cl.1.80.2016916528'
+		  	options.gt = 'c.1'
+		  	// options.lt = ''
+		  	options.limit = 10;
+            var count = 0;
+		  	db.createReadStream(options)
+			  .on('data', function (data) {
+			  	count++
+			    console.log(data.key, '=', data.value)
+			  })
+			  .on('error', function (err) {
+			    console.log('Oh my!', err)
+			  })
+			  .on('close', function () {
+			    console.log('Stream closed')
+			    endIt();
+			  })
+			  .on('end', function () {
+			    console.log('Stream ended,count:'+count)
+			  })
+	  })
 
 	// it('get key', function(endIt){
 	// 	  var key = 'cl.2.3196142051.1080'
@@ -101,12 +101,12 @@ var levelup = require('level')
 	// 	  })
 	//   })
 
-	  it('del key', function(endIt){
-		  var key = 'cl.2.3196142051.1080'
-	      db.del(key, function (err) {
-		    console.log('key='+key+',err:'+err)
-		    endIt();
-		  })
-	  })
+	  // it('del key', function(endIt){
+		 //  var key = 'cl.2.3196142051.1080'
+	  //     db.del(key, function (err) {
+		 //    console.log('key='+key+',err:'+err)
+		 //    endIt();
+		 //  })
+	  // })
 
   });
