@@ -41,7 +41,7 @@ function post(callback, url, options, forms) {
 
 function channel(options, callback) {
   var domain = URLParser.parse(options.url).hostname;
-  return request.Channelmgr.select(domain, function(err, oChannel) {
+  return request.useChannel().select(domain, function(err, oChannel) {
     console.log('selectChannel:' + domain + ',err:' + err + ',channel:' + JSON.stringify(oChannel))
     if (oChannel) {
       options.proxy = 'http://' + oChannel.host + ':' + oChannel.port
@@ -74,7 +74,7 @@ function channel(options, callback) {
         useChannel = new Channel(channelLevel, unitArr[0], unitArr[1]);
         console.info('useChannel[' + useChannel.channelKey() + '],proxy[' + options.proxy + '],state:' + error)
       }
-      request.Channelmgr.receive(error, useChannel)
+      request.useChannel().receive(error, useChannel)
       body = response ? response.body : body
       return callback(error, response, body)
     })
@@ -83,6 +83,15 @@ function channel(options, callback) {
 
 request.get = get
 request.post = post
+
+request.useChannel = function(channelmgr) {
+  if(!channelmgr &&  request._channel) {
+    return request._channel
+  }else {
+    request._channel = channelmgr || new request.Channelmgr();
+  }
+  return request._channel
+}
 module.exports = request
 request.Requestmgr = require('./requestmgr')
 request.Channelmgr = require('./channelmgr')

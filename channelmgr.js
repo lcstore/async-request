@@ -5,20 +5,23 @@ var URLParser = require('url')
 
 
 var proxyutils = require('./lib/toolutils')
-  , channelDao = require('./lib/channeldao')
+  
 
 const MIN_SELECT_LEVEL=1
 const MAX_SELECT_LEVEL=5
-function Channelmgr (){
+function Channelmgr (db){
     var self = this
+    var ChannelDao = require('./lib/ChannelDao')
+    var channelDao = new ChannelDao(db);
     self._pools = []
     var maxCounts = [0,50,100,500,1000]
     var incrCounts = [0,10,20,50,100]
     for (var level = MIN_SELECT_LEVEL; level < MAX_SELECT_LEVEL; level++) {
-        self._pools.push(new ChannelPool(level,maxCounts[level],incrCounts[level]))
+        self._pools.push(new ChannelPool(channelDao,level,maxCounts[level],incrCounts[level]))
     }
     // reverse for concatSeries
     self._pools = self._pools.reverse();
+    self._channelDao = channelDao;
 }
 
 Channelmgr.prototype.addChannel = function(level,host,port,callback){
@@ -32,7 +35,7 @@ Channelmgr.prototype.addChannel = function(level,host,port,callback){
      err.message = 'BadParam,level['+level+'],host['+host+'],port['+port+']'
      return callback(err)
    } else {
-     channelDao.addChannel(level,host,port,callback) 
+     self._channelDao.addChannel(level,host,port,callback) 
    }
    
 }
@@ -108,7 +111,7 @@ Channelmgr.prototype.receive = function(error,oChannel,rcb){
 }
 
 
-function ChannelPool(level,maxCount,incrCount){
+function ChannelPool(channelDao, level,maxCount,incrCount){
     this._key = 'cl.'+level+'.'
     this._level = level
     this._maxCount = maxCount
@@ -116,6 +119,7 @@ function ChannelPool(level,maxCount,incrCount){
     this._gtKey = this._key
     this._gtKey = 'cl.1.8888.465957466'
     this._ltKey = 'cl.'+(level+1)+'.'
+    this._channelDao = channelDao
     this._channels = []
     this._channelMap = {};
 }
@@ -131,7 +135,7 @@ ChannelPool.prototype.load = function(callback){
        }
        return
     }
-    channelDao.find(from,to,limit,(err,channelArr) => {
+    self._channelDao.find(from,to,limit,(err,channelArr) => {
        console.log('load[',from,',',to,'].limit:',limit,',err:',err,',channelArr:',channelArr?channelArr.length:-1)
        if(err) {
           if(callback) {
@@ -158,7 +162,7 @@ ChannelPool.prototype.load = function(callback){
 ChannelPool.prototype.freeze = function(channel,ucb){
     var self = this
     console.log('[',new Date(),'],freeze channel:',JSON.stringify(channel))
-    channelDao.put(channel,(err) => {
+    self._channelDao.put(channel,(err) => {
        var key =  channel.host +':'+channel.port
        console.log('freeze['+key+'],channel:'+JSON.stringify(channel))
        delete self._channelMap[key]
@@ -267,9 +271,8 @@ function doCallBack (err,callback) {
 ChannelPool.prototype.incrLevel = function(oChannel,incrNum,ccb){
     var self = this
     var newLevel = oChannel.level + incrNum
-    channelDao.changeLevel(oChannel,newLevel,ccb)
+    self._channelDao.changeLevel(oChannel,newLevel,ccb)
 }
 
+module.exports = Channelmgr
 
-
-module.exports = new Channelmgr()
