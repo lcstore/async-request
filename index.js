@@ -19,7 +19,7 @@ function request(options, callback) {
 }
 
 function get(callback, url, options) {
-  var newOptions = extend(true, options);
+  var newOptions = extend({}, options);
   newOptions.url = url;
   newOptions.method = 'GET';
   return request(newOptions, (err, response) => {
@@ -29,7 +29,7 @@ function get(callback, url, options) {
 }
 
 function post(callback, url, options, forms) {
-  var newOptions = extend(true, options);
+  var newOptions = extend({}, options);
   newOptions.url = url;
   newOptions.method = 'POST';
   newOptions.form = forms;
