@@ -11,7 +11,7 @@ const MIN_SELECT_LEVEL=1
 const MAX_SELECT_LEVEL=5
 function Channelmgr (db){
     var self = this
-    var ChannelDao = require('./lib/ChannelDao')
+    var ChannelDao = require('./lib/channeldao')
     var channelDao = new ChannelDao(db);
     self._pools = []
     var maxCounts = [0,50,100,500,1000]
