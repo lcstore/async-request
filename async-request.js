@@ -19,6 +19,7 @@ function AsyncRequest(options, callback) {
 		if (validateFunc && util.isFunction(validateFunc)) {
 			try {
 				error = validateFunc(error, response);
+				error && (error.validate = true)
 			} catch (verror) {
 				error = verror;
 			}
