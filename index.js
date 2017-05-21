@@ -5,10 +5,6 @@ var URLParser = require('url'),
 
 var Channel = require('./lib/channel')
 
-const KEY_REQUEST_PROXY = 'REQUEST-PROXY-ADDR'
-const KEY_REQUEST_PROXY_LEVEL = 'REQUEST-PROXY-LEVEL'
-
-
 
 function request(options, callback) {
   if (options.proxymgrOptions) {
@@ -48,24 +44,9 @@ function channel(options, callback) {
       options.proxyLevel = oChannel.level
     }
     return request.Requestmgr.request(options, (error, response, body) => {
-      var validateFunc = options.validate;
-      if (validateFunc && util.isFunction(validateFunc)) {
-        try {
-          error = validateFunc(error, response);
-        } catch (verror) {
-          error = verror;
-        }
-      }
+      
       var useChannel;
       if (options.proxy) {
-        if (error) {
-          error[KEY_REQUEST_PROXY] = options.proxy
-          error[KEY_REQUEST_PROXY_LEVEL] = options.proxyLevel
-        } else if (response) {
-          response.headers = response.headers || {}
-          response.headers[KEY_REQUEST_PROXY] = options.proxy
-          response.headers[KEY_REQUEST_PROXY_LEVEL] = options.proxyLevel
-        }
         var sMark = '://'
         var index = options.proxy.indexOf(sMark);
         var sHostPort = options.proxy.substring(index + sMark.length);

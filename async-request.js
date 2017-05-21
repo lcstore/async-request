@@ -5,13 +5,37 @@ var util = require('util'),
 	URLParser = require('url')
 var AsyncId = require('./async-id').asyncId
 	// Request.debug = true
+const KEY_REQUEST_PROXY = 'REQUEST-PROXY-ADDR'
+const KEY_REQUEST_PROXY_LEVEL = 'REQUEST-PROXY-LEVEL'
 
 function AsyncRequest(options, callback) {
 	var self = this;
 	self.optionJson(options)
 	self.optionGzip(options)
+	self.optionTime(options)
 	self.options = options;
-	self.callback = callback;
+	self.callback = function(error, response, body) {
+		var validateFunc = options.validate;
+		if (validateFunc && util.isFunction(validateFunc)) {
+			try {
+				error = validateFunc(error, response);
+			} catch (verror) {
+				error = verror;
+			}
+		}
+		if (options.proxy) {
+			if (error) {
+				error[KEY_REQUEST_PROXY] = options.proxy
+				error[KEY_REQUEST_PROXY_LEVEL] = options.proxyLevel
+			} else if (response) {
+				response.headers = response.headers || {}
+				response.headers[KEY_REQUEST_PROXY] = options.proxy
+				response.headers[KEY_REQUEST_PROXY_LEVEL] = options.proxyLevel
+			}
+		}
+		body = response == null ? null : response.body
+		return callback(error, response, body)
+	};
 	self.domain = URLParser.parse(options.url).hostname;
 	self.id = AsyncId.next();
 	self.taskId = options.taskId;
@@ -79,6 +103,14 @@ AsyncRequest.prototype.optionGzip = function(options) {
 	if (headVal && headVal.toLowerCase().indexOf('gzip') >= 0) {
 		options.gzip = true;
 	}
+}
+
+AsyncRequest.prototype.optionTime = function(options) {
+	var self = this
+	if (options.timeout) {
+		return;
+	}
+	options.timeout = 20000
 }
 
 AsyncRequest.prototype.toContent = function(response) {

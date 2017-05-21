@@ -1,7 +1,7 @@
 var should = require("should")
   , iconv = require('iconv-lite');
 var AsyncRequest = require('../async-request');
-var AsyncRequestIndex = require('../index');
+var Channelmgr = require('../index').useChannel();
 
 describe('Async-request', function(){
 	it('Get requestId', function(endIt){
@@ -49,7 +49,7 @@ describe('Async-request', function(){
 		var level = 2
 		var host = '1033615407'
 		var port = 8081
-		AsyncRequestIndex.Channelmgr.addChannel(level,host,port,(err)=>{
+		Channelmgr.addChannel(level,host,port,(err)=>{
             console.log('err:'+err)
             endIt();
 		})

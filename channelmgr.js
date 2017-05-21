@@ -25,6 +25,7 @@ function Channelmgr (db){
 }
 
 Channelmgr.prototype.addChannel = function(level,host,port,callback){
+   var self = this
    var bPass = level && host && port
    if(port <= 0 || port >= 65536) {
       bPass = false;

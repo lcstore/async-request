@@ -1,5 +1,5 @@
 var should = require("should")
-  , Channel = require('../channel');
+  , Channel = require('../lib/channel');
 
 describe('Channel', function(){
 	it('newChannel', function(){
