@@ -4,6 +4,7 @@ var util = require('util'),
 	moment = require('moment'),
 	URLParser = require('url')
 var AsyncId = require('./async-id').asyncId
+var logger = require('./lib/logger')
 	// Request.debug = true
 const KEY_REQUEST_PROXY = 'REQUEST-PROXY-ADDR'
 const KEY_REQUEST_PROXY_LEVEL = 'REQUEST-PROXY-LEVEL'
@@ -14,6 +15,10 @@ function AsyncRequest(options, callback) {
 	self.optionGzip(options)
 	self.optionTime(options)
 	self.options = options;
+	self.domain = URLParser.parse(options.url).hostname;
+	self.id = AsyncId.next();
+	self.taskId = options.taskId;
+	self.initMills = new Date().getTime();
 	self.callback = function(error, response, body) {
 		var validateFunc = options.validate;
 		if (validateFunc && util.isFunction(validateFunc)) {
@@ -28,21 +33,20 @@ function AsyncRequest(options, callback) {
 			if (error) {
 				error[KEY_REQUEST_PROXY] = options.proxy
 				error[KEY_REQUEST_PROXY_LEVEL] = options.proxyLevel
+				logger.info('AsyncRequest:'+self.id+',Error:' + JSON.stringify(error))
 			} else if (response) {
 				response.headers = response.headers || {}
 				response.headers[KEY_REQUEST_PROXY] = options.proxy
 				response.headers[KEY_REQUEST_PROXY_LEVEL] = options.proxyLevel
+				logger.info('AsyncRequest:'+self.id+'.Code:'+response.statusCode+',ResponseHeaders:' + JSON.stringify(response.headers))
 			}
 		}
 		body = response == null ? null : response.body
 		return callback(error, response, body)
 	};
-	self.domain = URLParser.parse(options.url).hostname;
-	self.id = AsyncId.next();
-	self.taskId = options.taskId;
-	self.initMills = new Date().getTime();
 
-	console.log('AsyncRequest:' + JSON.stringify(options))
+
+	logger.info('AsyncRequest:'+self.id+',Options:' + JSON.stringify(options))
 	events.EventEmitter.call(self)
 }
 util.inherits(AsyncRequest, events.EventEmitter);

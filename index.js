@@ -4,6 +4,7 @@ var URLParser = require('url'),
   util = require('util')
 
 var Channel = require('./lib/channel')
+var logger = require('./lib/logger')
 
 
 function request(options, callback) {
@@ -38,7 +39,7 @@ function post(callback, url, options, forms) {
 function channel(options, callback) {
   var domain = URLParser.parse(options.url).hostname;
   return request.useChannel().select(domain, function(err, oChannel) {
-    console.log('selectChannel:' + domain + ',err:' + err + ',channel:' + JSON.stringify(oChannel))
+    logger.log('selectChannel:' + domain + ',err:' + err + ',channel:' + JSON.stringify(oChannel))
     if (oChannel) {
       options.proxy = 'http://' + oChannel.host + ':' + oChannel.port
       options.proxyLevel = oChannel.level
@@ -53,7 +54,7 @@ function channel(options, callback) {
         var unitArr = sHostPort.split(':');
         var channelLevel = options.proxyLevel || 1;
         useChannel = new Channel(channelLevel, unitArr[0], unitArr[1]);
-        console.info('useChannel[' + useChannel.channelKey() + '],proxy[' + options.proxy + '],state:' + error)
+        logger.info('useChannel[' + useChannel.channelKey() + '],proxy[' + options.proxy + '],state:' + error)
       }
       request.useChannel().receive(error, useChannel)
       body = response ? response.body : body
@@ -73,6 +74,7 @@ request.useChannel = function(channelmgr) {
   }
   return request._channel
 }
+
 module.exports = request
 request.Requestmgr = require('./requestmgr')
 request.Channelmgr = require('./channelmgr')
