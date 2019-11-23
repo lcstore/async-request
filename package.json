@@ -1,6 +1,6 @@
 {
   "name": "async-request",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "async request",
   "main": "index.js",
   "scripts": {
@@ -25,7 +25,6 @@
     "async": "^1.5.2",
     "bluebird": "^3.5.2",
     "extend": "^3.0.2",
-    "level": "^4.0.0",
     "moment": "^2.22.2",
     "request": "^2.88.0",
     "socks5-http-client": "^1.0.4",

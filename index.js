@@ -76,5 +76,3 @@ request.useChannel = function(channelmgr) {
 }
 
 module.exports = request
-request.Requestmgr = require('./requestmgr')
-request.Channelmgr = require('./channelmgr')

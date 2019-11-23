@@ -16,4 +16,3 @@ logs/
 node_modules/
 channelDB/
 nohup.out
-package-lock.json
