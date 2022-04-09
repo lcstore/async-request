@@ -25,7 +25,7 @@
     "async": "^1.5.2",
     "bluebird": "^3.5.2",
     "extend": "^3.0.2",
-    "moment": "^2.22.2",
+    "moment": "^2.29.2",
     "request": "^2.88.0",
     "socks5-http-client": "^1.0.4",
     "socks5-https-client": "^1.2.1",
